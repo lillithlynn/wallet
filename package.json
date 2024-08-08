@@ -193,7 +193,7 @@
     "abi-decoder": "2.3.0"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "0.12.4",
+    "@angular-devkit/build-angular": "18.1.4",
     "@angular/cli": "7.1.4",
     "@biesbjerg/ngx-translate-extract": "2.3.4",
     "@ionic-native-mocks/file": "2.0.12",
