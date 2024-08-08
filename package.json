@@ -153,7 +153,7 @@
     "cordova-plugin-dialogs": "2.0.2",
     "cordova-plugin-fcm-ng": "10.0.3",
     "cordova-plugin-file": "6.0.2",
-    "cordova-plugin-fingerprint-aio": "3.0.1",
+    "cordova-plugin-fingerprint-aio": "5.0.1",
     "cordova-plugin-globalization": "1.0.9",
     "cordova-plugin-idfa": "2.0.0",
     "cordova-plugin-inappbrowser": "4.1.0",
