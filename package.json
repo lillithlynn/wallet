@@ -195,7 +195,7 @@
   "devDependencies": {
     "@angular-devkit/build-angular": "18.1.4",
     "@angular/cli": "7.1.4",
-    "@biesbjerg/ngx-translate-extract": "2.3.4",
+    "@biesbjerg/ngx-translate-extract": "7.0.4",
     "@ionic-native-mocks/file": "2.0.12",
     "@ionic-native-mocks/fingerprint-aio": "2.0.12",
     "@ionic-native-mocks/qr-scanner": "2.0.12",
