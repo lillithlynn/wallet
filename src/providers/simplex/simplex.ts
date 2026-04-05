@@ -103,7 +103,8 @@ export class SimplexProvider {
       'dai',
       'usdc',
       'ltc',
-      'shib'
+      'shib',
+      'xrp'
     ];
     this.fiatAmountLimits = {
       min: 50,
@@ -212,6 +213,11 @@ export class SimplexProvider {
       .toFixed(2);
   }
 
+  public checkSimplexCoin(coin: string): string {
+    if (coin == 'PAX') return 'USDP';
+    return coin;
+  }
+
   public async simplexPaymentRequest(
     wallet,
     address: string,
@@ -244,11 +250,11 @@ export class SimplexProvider {
             amount: quoteData.fiatTotalAmount
           },
           requested_digital_amount: {
-            currency: wallet.coin.toUpperCase(),
+            currency: this.checkSimplexCoin(wallet.coin.toUpperCase()),
             amount: quoteData.cryptoAmount
           },
           destination_wallet: {
-            currency: wallet.coin.toUpperCase(),
+            currency: this.checkSimplexCoin(wallet.coin.toUpperCase()),
             address,
             tag: ''
           },

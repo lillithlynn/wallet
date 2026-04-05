@@ -208,6 +208,7 @@ export class ExchangeCryptoPage {
   }
 
   private async getExchangesCurrencies() {
+    let country;
     const reflect = promiseObj => {
       return promiseObj.promise.then(
         v => {
@@ -231,7 +232,7 @@ export class ExchangeCryptoPage {
     ];
 
     try {
-      const country = await this.locationProvider.getCountry();
+      country = await this.locationProvider.getCountry();
       const opts = { country };
       this.logger.debug(`Setting available currencies for country: ${country}`);
 
@@ -329,8 +330,17 @@ export class ExchangeCryptoPage {
             _.isArray(promise.data.result) &&
             promise.data.result.length > 0
           ) {
+            const availableChains: string[] = this.currencyProvider.getAvailableChains();
             const supportedCoinsWithFixRateEnabled = promise.data.result
-              .filter(coin => coin.enabled && coin.fixRateEnabled)
+              .filter(
+                coin =>
+                  coin.enabled &&
+                  coin.fixRateEnabled &&
+                  coin.protocol &&
+                  [...availableChains, 'erc20'].includes(
+                    coin.protocol.toLowerCase()
+                  )
+              )
               .map(({ name }) => name);
 
             // TODO: add support to float-rate coins supported by Changelly
@@ -338,7 +348,7 @@ export class ExchangeCryptoPage {
               this.currencyProvider.getAvailableCoins(),
               supportedCoinsWithFixRateEnabled
             );
-            const coinsToRemove = ['xrp'];
+            const coinsToRemove = country == 'US' ? ['xrp'] : [];
             coinsToRemove.forEach((coin: string) => {
               const index = this.changellySupportedCoins.indexOf(coin);
               if (index > -1) {
