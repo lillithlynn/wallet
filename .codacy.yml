@@ -1,0 +1,12 @@
+exclude-paths:
+  - resources/copay/android
+  - src/assets/img
+engines:
+  eslint:
+    enabled: true
+  pmd:
+    enabled: true
+    exclude-paths:
+      - resources/copay/android
+  tslint:
+    enabled: true
