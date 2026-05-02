@@ -52,7 +52,20 @@ jobs:
           gh-code-scanning-compat: true
           # Force 0 exit code to allow SARIF file generation
           # This will handover control about PR rejection to the GitHub side
-          max-allowed-issues: 2147483647
+          max-allowed-issues: ---
+exclude-paths:
+  - resources
+  - src/assets
+
+tools:
+  eslint:
+    enabled: true
+  pmd:
+    enabled: false  # Disable if no Java code, or provide proper config
+  pmd-legacy:
+    enabled: false
+  tslint:
+    enabled: true2147483647
 
       # Upload the SARIF file generated in the previous step
       - name: Upload SARIF results file
