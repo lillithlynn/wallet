@@ -93,7 +93,7 @@ export class WalletDetailsPage {
 
   public supportedCards: Promise<CardConfigMap>;
   constructor(
-    private currencyProvider: CurrencyProvider,
+    public currencyProvider: CurrencyProvider,
     private navParams: NavParams,
     private navCtrl: NavController,
     private walletProvider: WalletProvider,
@@ -134,6 +134,7 @@ export class WalletDetailsPage {
         this.buyCryptoProvider.exchangeCoinsSupported,
         this.wallet.coin
       ) &&
+      !['xrp'].includes(this.wallet.coin) &&
       (this.wallet.network == 'livenet' ||
         (this.wallet.network == 'testnet' && env.name == 'development'));
 
@@ -143,17 +144,49 @@ export class WalletDetailsPage {
         this.wallet.coin
       )
     ) {
-      this.showExchangeCrypto = this.wallet.network == 'livenet' ? true : false;
+      this.showExchangeCrypto =
+        this.wallet.network == 'livenet' && !['xrp'].includes(this.wallet.coin)
+          ? true
+          : false;
     }
 
-    if (!this.showExchangeCrypto) {
+    if (!this.showExchangeCrypto || !this.showBuyCrypto) {
       this.locationProvider.getCountry().then(country => {
-        this.showExchangeCrypto =
-          country != 'US' &&
-          this.currencyProvider.isERCToken(this.wallet.coin) &&
-          this.wallet.network == 'livenet'
-            ? true
-            : false;
+        if (!this.showBuyCrypto) {
+          if (
+            country != 'US' &&
+            this.wallet.network == 'livenet' &&
+            ['xrp'].includes(this.wallet.coin)
+          ) {
+            this.showBuyCrypto = true;
+          }
+        }
+
+        if (!this.showExchangeCrypto) {
+          if (
+            country != 'US' &&
+            this.wallet.network == 'livenet' &&
+            ['xrp'].includes(this.wallet.coin)
+          ) {
+            this.showExchangeCrypto = true;
+          } else {
+            const opts = { country };
+            this.exchangeCryptoProvider
+              .checkServiceAvailability('1inch', opts)
+              .then(isAvailable => {
+                if (isAvailable) {
+                  this.showExchangeCrypto =
+                    this.currencyProvider.isERCToken(this.wallet.coin) &&
+                    this.wallet.network == 'livenet'
+                      ? true
+                      : false;
+                }
+              })
+              .catch(err => {
+                if (err) this.logger.error(err);
+              });
+          }
+        }
       });
     }
 
@@ -442,7 +475,11 @@ export class WalletDetailsPage {
   };
 
   public itemTapped(tx) {
-    if (tx.hasUnconfirmedInputs) {
+    if (
+      tx.hasUnconfirmedInputs &&
+      (tx.action === 'received' || tx.action === 'moved') &&
+      this.wallet.coin == 'btc'
+    ) {
       const infoSheet = this.actionSheetProvider.createInfoSheet(
         'unconfirmed-inputs'
       );
@@ -450,7 +487,11 @@ export class WalletDetailsPage {
       infoSheet.onDidDismiss(() => {
         this.goToTxDetails(tx);
       });
-    } else if (tx.isRBF) {
+    } else if (
+      tx.isRBF &&
+      tx.action === 'received' &&
+      this.wallet.coin == 'btc'
+    ) {
       const infoSheet = this.actionSheetProvider.createInfoSheet('rbf-tx');
       infoSheet.present();
       infoSheet.onDidDismiss(option => {
@@ -488,7 +529,10 @@ export class WalletDetailsPage {
           this.wallet.coin === 'eth' && tx.customData
             ? tx.customData.toWalletName
             : this.wallet.name,
-        nonce: tx.nonce
+        nonce: tx.nonce,
+        data: tx.data,
+        gasLimit: tx.gasLimit,
+        customData: tx.customData
       };
       const nextView = {
         name: 'ConfirmPage',
@@ -574,9 +618,13 @@ export class WalletDetailsPage {
     )
       return false;
 
+    const isERC20Transfer = tx && tx.abiType && tx.abiType.name === 'transfer';
+    const isERC20Wallet = this.currencyProvider.isERCToken(this.wallet.coin);
+    const isEthWallet = this.wallet.coin === 'eth';
+
     if (
-      (this.wallet.coin === 'eth' && tx.amount !== 0) ||
-      this.currencyProvider.isERCToken(this.wallet.coin)
+      (isEthWallet && !isERC20Transfer) ||
+      (isERC20Wallet && isERC20Transfer)
     ) {
       // Can speed up the eth/erc20 tx instantly
       return (
@@ -587,11 +635,12 @@ export class WalletDetailsPage {
       const currentTime = moment();
       const txTime = moment(tx.time * 1000);
 
-      // Can speed up the btc tx after 4 hours without confirming
+      // Can speed up the btc tx after 1 hours without confirming
       return (
-        currentTime.diff(txTime, 'hours') >= 4 &&
+        currentTime.diff(txTime, 'hours') >= 1 &&
         this.isUnconfirmed(tx) &&
-        tx.action === 'received'
+        tx.action === 'received' &&
+        this.wallet.coin == 'btc'
       );
     }
   }

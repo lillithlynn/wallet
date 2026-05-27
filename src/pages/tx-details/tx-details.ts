@@ -22,6 +22,8 @@ import { TxConfirmNotificationProvider } from '../../providers/tx-confirm-notifi
 import { TxFormatProvider } from '../../providers/tx-format/tx-format';
 import { WalletProvider } from '../../providers/wallet/wallet';
 
+// Pages
+import { ConfirmPage } from '../send/confirm/confirm';
 @Component({
   selector: 'page-tx-details',
   templateUrl: 'tx-details.html'
@@ -235,11 +237,13 @@ export class TxDetailsModal {
         }
 
         if (this.btx.action != 'invalid') {
-          if (this.btx.action == 'sent')
+          if (this.wallet.coin === 'eth' && this.btx.error)
+            this.title = this.translate.instant('Failed');
+          else if (this.btx.action == 'sent')
             this.title = this.translate.instant('Sent');
-          if (this.btx.action == 'received')
+          else if (this.btx.action == 'received')
             this.title = this.translate.instant('Received');
-          if (this.btx.action == 'moved')
+          else if (this.btx.action == 'moved')
             this.title = this.translate.instant('Sent to self');
         }
 
@@ -388,5 +392,77 @@ export class TxDetailsModal {
 
   close() {
     this.viewCtrl.dismiss();
+  }
+
+  private async getTransaction(): Promise<any> {
+    try {
+      const txp = await this.walletProvider.getTxp(
+        this.wallet,
+        this.btx.proposalId
+      );
+      return txp;
+    } catch (error) {
+      this.logger.warn(error);
+    }
+  }
+
+  public async goToConfirm() {
+    const txp = await this.getTransaction(); // only way to get actual inputs and ouputs
+    const inputs = txp.inputs;
+    const multiRecipients = [];
+
+    if (this.btx.hasMultiplesOutputs) {
+      txp.outputs.forEach(output => {
+        let amountToShow: string = +output.amount
+          ? this.txFormatProvider.formatAmount(this.wallet.coin, +output.amount)
+          : null;
+
+        let altAmountStr = this.txFormatProvider.formatAlternativeStr(
+          this.wallet.coin,
+          +output.amount
+        );
+
+        multiRecipients.push({
+          amount: output.amount,
+          amountToShow,
+          altAmountStr: altAmountStr ? altAmountStr : null,
+          toAddress: output.toAddress,
+          recipientType: 'address'
+        });
+      });
+      let totalAmount = 0;
+      multiRecipients.forEach(recipient => {
+        totalAmount += recipient.amount;
+      });
+      this.navCtrl.push(ConfirmPage, {
+        walletId: this.wallet.credentials.walletId,
+        fromMultiSend: true,
+        fromReplaceByFee: true,
+        totalAmount,
+        recipientType: 'multi',
+        color: this.wallet.color,
+        coin: this.wallet.coin,
+        network: this.wallet.network,
+        useSendMax: false,
+        recipients: multiRecipients,
+        description: this.btx.message,
+        inputs
+      });
+    } else {
+      const toAddress = this.btx.outputs[0].address;
+      const amount = this.btx.amount;
+      this.navCtrl.push(ConfirmPage, {
+        walletId: this.wallet.credentials.walletId,
+        fromReplaceByFee: true,
+        amount,
+        toAddress,
+        coin: this.wallet.coin,
+        network: this.wallet.network,
+        useSendMax: false,
+        description: this.btx.message,
+        inputs
+      });
+    }
+    this.close();
   }
 }

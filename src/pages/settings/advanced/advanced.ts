@@ -21,6 +21,9 @@ import { WalletRecoverPage } from './wallet-recover-page/wallet-recover-page';
 })
 export class AdvancedPage {
   public spendUnconfirmed: boolean;
+  public showCustomizeNonce: boolean;
+  public showEnableRBF: boolean;
+
   public isCopay: boolean;
   public oldProfileAvailable: boolean;
   public wallets;
@@ -60,12 +63,32 @@ export class AdvancedPage {
     let config = this.configProvider.get();
 
     this.spendUnconfirmed = config.wallet.spendUnconfirmed;
+    this.showEnableRBF = config.wallet.showEnableRBF;
+    this.showCustomizeNonce = config.wallet.showCustomizeNonce;
   }
 
   public spendUnconfirmedChange(): void {
     let opts = {
       wallet: {
         spendUnconfirmed: this.spendUnconfirmed
+      }
+    };
+    this.configProvider.set(opts);
+  }
+
+  public showCustomizeNonceChange(): void {
+    let opts = {
+      wallet: {
+        showCustomizeNonce: this.showCustomizeNonce
+      }
+    };
+    this.configProvider.set(opts);
+  }
+
+  public showEnableRBFChange(): void {
+    let opts = {
+      wallet: {
+        showEnableRBF: this.showEnableRBF
       }
     };
     this.configProvider.set(opts);

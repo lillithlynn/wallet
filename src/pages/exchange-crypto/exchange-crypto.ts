@@ -71,7 +71,10 @@ export class ExchangeCryptoPage {
   public fixedRateId: string;
   public rate: number;
   public estimatedFee: number;
-  private country: string;
+  public isAvailable: {
+    changelly?: boolean;
+    oneInch?: boolean;
+  };
   private exchangeCryptoSupportedCoins: any[];
   private changellySupportedCoins: string[]; // Supported by Changelly and Bitpay
 
@@ -141,6 +144,11 @@ export class ExchangeCryptoPage {
       'Select Destination Wallet'
     );
 
+    this.isAvailable = {
+      changelly: true,
+      oneInch: true
+    };
+
     this.onGoingProcessProvider.set('exchangeCryptoInit');
 
     this.slippageValues = [
@@ -200,6 +208,7 @@ export class ExchangeCryptoPage {
   }
 
   private async getExchangesCurrencies() {
+    let country;
     const reflect = promiseObj => {
       return promiseObj.promise.then(
         v => {
@@ -215,15 +224,6 @@ export class ExchangeCryptoPage {
       );
     };
 
-    try {
-      this.country = await this.locationProvider.getCountry();
-      this.logger.debug(
-        `Setting available currencies for country: ${this.country}`
-      );
-    } catch (e) {
-      this.logger.warn("It was not possible to get the user's country.");
-    }
-
     const promises = [
       {
         exchange: 'changelly',
@@ -231,7 +231,21 @@ export class ExchangeCryptoPage {
       }
     ];
 
-    if (this.country != 'US') {
+    try {
+      country = await this.locationProvider.getCountry();
+      const opts = { country };
+      this.logger.debug(`Setting available currencies for country: ${country}`);
+
+      this.isAvailable.oneInch = await this.exchangeCryptoProvider.checkServiceAvailability(
+        '1inch',
+        opts
+      );
+      this.logger.debug(`1Inch isAvailable: ${this.isAvailable.oneInch}`);
+    } catch (e) {
+      this.logger.warn("It was not possible to get the user's country.", e);
+    }
+
+    if (this.isAvailable.oneInch) {
       promises.push({
         exchange: '1inch',
         promise: this.oneInchProvider.getCurrencies1inch()
@@ -316,8 +330,17 @@ export class ExchangeCryptoPage {
             _.isArray(promise.data.result) &&
             promise.data.result.length > 0
           ) {
+            const availableChains: string[] = this.currencyProvider.getAvailableChains();
             const supportedCoinsWithFixRateEnabled = promise.data.result
-              .filter(coin => coin.enabled && coin.fixRateEnabled)
+              .filter(
+                coin =>
+                  coin.enabled &&
+                  coin.fixRateEnabled &&
+                  coin.protocol &&
+                  [...availableChains, 'erc20'].includes(
+                    coin.protocol.toLowerCase()
+                  )
+              )
               .map(({ name }) => name);
 
             // TODO: add support to float-rate coins supported by Changelly
@@ -325,7 +348,7 @@ export class ExchangeCryptoPage {
               this.currencyProvider.getAvailableCoins(),
               supportedCoinsWithFixRateEnabled
             );
-            const coinsToRemove = ['xrp'];
+            const coinsToRemove = country == 'US' ? ['xrp'] : [];
             coinsToRemove.forEach((coin: string) => {
               const index = this.changellySupportedCoins.indexOf(coin);
               if (index > -1) {
@@ -517,12 +540,17 @@ export class ExchangeCryptoPage {
       supportedCoins.splice(index, 1);
     }
 
+    const bitpaySupportedTokens: string[] = this.currencyProvider
+      .getBitpaySupportedTokens()
+      .map(token => token.symbol.toLowerCase());
+
     const oneInchAllSupportedCoins = this.oneInchAllSupportedCoins.filter(
       token => {
-        return (
-          token.symbol.toLowerCase() != this.fromWalletSelected.coin &&
-          token.symbol.toLowerCase() != 'eth'
-        );
+        return ![
+          'eth',
+          this.fromWalletSelected.coin,
+          ...bitpaySupportedTokens
+        ].includes(token.symbol.toLowerCase());
       }
     );
 
@@ -597,7 +625,7 @@ export class ExchangeCryptoPage {
 
     this.logger.debug('Exchange to use: ' + this.exchangeToUse);
 
-    if (this.exchangeToUse == '1inch' && this.country == 'US') {
+    if (this.exchangeToUse == '1inch' && !this.isAvailable.oneInch) {
       const oneInchDisabledWarningSheet = this.actionSheetProvider.createInfoSheet(
         '1inch-disabled-warning'
       );
@@ -667,6 +695,35 @@ export class ExchangeCryptoPage {
     } else {
       this.toToken = null;
     }
+
+    const isERCToken = this.currencyProvider.isERCToken(
+      this.toWalletSelected.coin
+    );
+
+    if (
+      isERCToken ||
+      (this.toWalletSelected.coin == 'eth' &&
+        selectedToken &&
+        selectedToken.symbol)
+    ) {
+      const coin = isERCToken
+        ? this.toWalletSelected.coin.toUpperCase()
+        : selectedToken.symbol;
+
+      const linkedEthWalletName = isERCToken
+        ? this.toWalletSelected.linkedEthWalletName
+        : this.toWalletSelected.name;
+
+      const infoSheet = this.actionSheetProvider.createInfoSheet(
+        'erc20-eth-fee-info',
+        {
+          coin,
+          linkedEthWalletName
+        }
+      );
+      infoSheet.present();
+    }
+
     this.setExchangeToUse();
   }
 

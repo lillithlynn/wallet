@@ -39,6 +39,7 @@ import { ConfirmPage } from '../confirm/confirm';
 
 import { TranslateService } from '@ngx-translate/core';
 import { CoinbaseWithdrawPage } from '../../integrations/coinbase/coinbase-withdraw/coinbase-withdraw';
+import { PhonePage } from '../../integrations/gift-cards/phone/phone';
 
 @Component({
   selector: 'page-amount',
@@ -171,6 +172,8 @@ export class AmountPage {
 
     this.requestingAmount =
       this.navParams.get('nextPage') === 'CustomAmountPage';
+    this.cardName = this.navParams.get('cardName');
+    this.cardConfig = this.navParams.get('cardConfig');
     this.nextView = this.getNextView();
 
     // BitPay Card ID or Wallet ID or Coinbase Account ID
@@ -178,9 +181,6 @@ export class AmountPage {
 
     // Use only with Coinbase Withdraw
     this.toWalletId = this.navParams.data.toWalletId;
-
-    this.cardName = this.navParams.get('cardName');
-    this.cardConfig = this.navParams.get('cardConfig');
   }
 
   async ionViewDidLoad() {
@@ -322,7 +322,9 @@ export class AmountPage {
         nextPage = BitPayCardTopUpPage;
         break;
       case 'ConfirmCardPurchasePage':
-        nextPage = ConfirmCardPurchasePage;
+        nextPage = this.cardConfig.phoneRequired
+          ? PhonePage
+          : ConfirmCardPurchasePage;
         break;
       case 'CustomAmountPage':
         nextPage = CustomAmountPage;
@@ -350,15 +352,26 @@ export class AmountPage {
   }
 
   public sendMax(): void {
+    this.logger.debug('SendMax init');
     this.useSendMax = true;
     this.allowSend = true;
     if (!this.wallet) {
       return this.finish();
     }
+    if (
+      this.wallet.cachedStatus &&
+      this.wallet.cachedStatus.availableBalanceSat
+    )
+      this.logger.debug(
+        `availableBalanceSat: ${this.wallet.cachedStatus.availableBalanceSat}`
+      );
+
     const maxAmount = this.txFormatProvider.satToUnit(
       this.wallet.cachedStatus.availableBalanceSat,
       this.wallet.coin
     );
+    this.logger.debug(`maxAmount setted with: ${maxAmount}`);
+
     this.zone.run(() => {
       this.expression = this.availableUnits[this.unitIndex].isFiat
         ? this.toFiat(maxAmount, this.wallet.coin).toFixed(2)
@@ -462,7 +475,12 @@ export class AmountPage {
           this.checkAmountForBitpaycard(result);
         } else {
           this.alternativeAmount = result ? 'N/A' : null;
-          this.allowSend = false;
+          if (
+            this.rateProvider.isCoinAvailable(
+              this.availableUnits[this.unitIndex].id
+            )
+          )
+            this.allowSend = false;
         }
       } else {
         this.alternativeAmount = this.filterProvider.formatFiatAmount(

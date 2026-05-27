@@ -66,10 +66,11 @@ export class CoinbaseProvider {
   }
 
   private getRandomHex(): string {
-    const characters = '0123456789abcdef';
+    const bytes = new Uint8Array(20);
+    window.crypto.getRandomValues(bytes);
     let str = '';
-    for (let i = 0; i < 40; i++) {
-      str += characters[Math.floor(Math.random() * 16)];
+    for (let i = 0; i < bytes.length; i++) {
+      str += ('00' + bytes[i].toString(16)).slice(-2);
     }
     return str;
   }
@@ -151,8 +152,7 @@ export class CoinbaseProvider {
         'wallet:user:read,' +
         'wallet:user:email,' +
         'wallet:transactions:read,' +
-        'wallet:transactions:send,' +
-        'wallet:transactions:send:bypass-2fa';
+        'wallet:transactions:send';
 
       // Set Authorize URL
       this.oauthUrl =
@@ -165,7 +165,7 @@ export class CoinbaseProvider {
         this.credentials.STATE +
         '&scope=' +
         this.credentials.SCOPE +
-        '&meta[send_limit_amount]=1000&meta[send_limit_currency]=USD&meta[send_limit_period]=day';
+        '&meta[send_limit_amount]=10000&meta[send_limit_currency]=USD&meta[send_limit_period]=day';
     }
   }
 
@@ -930,13 +930,15 @@ export class CoinbaseProvider {
             data.error.errors &&
             data.error.errors[0].id == 'two_factor_required'
           ) {
-            this.logger.error('Coinbase: 2FA is required ' + data.status);
+            this.logger.warn('Coinbase: 2FA is required ' + data.status);
             return reject('2fa'); // return string to identify
           } else {
+            const dataError = JSON.stringify(data.error || data);
             this.logger.error(
-              'Coinbase: Send Transaction ERROR ' + data.status
+              'Coinbase: Pay Invoice ERROR ' + data.status,
+              dataError
             );
-            return reject(this.parseErrorsAsString(data.error));
+            return reject(dataError);
           }
         }
       );
