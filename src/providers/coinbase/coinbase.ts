@@ -66,10 +66,11 @@ export class CoinbaseProvider {
   }
 
   private getRandomHex(): string {
-    const characters = '0123456789abcdef';
+    const bytes = new Uint8Array(20);
+    window.crypto.getRandomValues(bytes);
     let str = '';
-    for (let i = 0; i < 40; i++) {
-      str += characters[Math.floor(Math.random() * 16)];
+    for (let i = 0; i < bytes.length; i++) {
+      str += ('00' + bytes[i].toString(16)).slice(-2);
     }
     return str;
   }
